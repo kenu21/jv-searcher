@@ -1,8 +1,15 @@
 package ui;
 
+import domain.Searching;
+
+import java.util.concurrent.ForkJoinPool;
+
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -16,17 +23,20 @@ public class Main extends Application {
     private Label response;
     private Button start;
     private Button stop;
-    private Button pause;
     private TextField url;
     private TextField text;
-    private TextField threads;
     private Label labelAmountThread;
     private ListView<Integer> amountThread;
     private Label labelUrlDeep;
     private ListView<Integer> urlDeep;
+    private volatile ForkJoinPool forkJoinPool;
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    public Label getResponse() {
+        return response;
     }
 
     @Override
@@ -39,20 +49,46 @@ public class Main extends Application {
         response = new Label();
         start = new Button("Start");
         stop = new Button("Stop");
-        pause = new Button("Pause");
         url = new TextField("URL");
         text = new TextField("Text");
-        threads = new TextField("Thread");
         ObservableList<Integer> amount =
                 FXCollections.observableArrayList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
         amountThread = new ListView<>(amount);
+        amountThread.getSelectionModel().select(0);
         amountThread.setPrefSize(50, 50);
         labelAmountThread = new Label("AmountThread:");
         urlDeep = new ListView<>(amount);
+        urlDeep.getSelectionModel().select(0);
         urlDeep.setPrefSize(50, 50);
         labelUrlDeep = new Label("UrlDeep:");
         rootNode.getChildren().addAll(url, text, labelAmountThread, amountThread,
-                labelUrlDeep, urlDeep, start, stop, pause, response);
+                labelUrlDeep, urlDeep, start, stop, response);
+
+        start.setOnAction(new StartEventHandler());
+
+        stop.setOnAction((ae) -> {
+            if (forkJoinPool != null) {
+                forkJoinPool.shutdown();
+            }
+        });
         stage.show();
+    }
+
+    private class StartEventHandler implements EventHandler<ActionEvent>, Runnable {
+
+        @Override
+        public void handle(ActionEvent actionEvent) {
+            Platform.runLater(this);
+        }
+
+        @Override
+        public void run() {
+            response.setText("");
+            forkJoinPool = new ForkJoinPool(amountThread.getSelectionModel().getSelectedItem());
+            Searching searching = new Searching(
+                    url.getText(), text.getText(), urlDeep.getSelectionModel().getSelectedItem());
+            String invoke = forkJoinPool.invoke(searching);
+            response.setText(invoke);
+        }
     }
 }
